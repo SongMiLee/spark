@@ -236,17 +236,17 @@ class FPGrowth private (
       minCount: Long,
       partitioner: Partitioner): Array[Item] = {
     data.flatMap { t =>
-      val uniq = t.toSet
-      if (t.length != uniq.size) {
-        throw new SparkException(s"Items in a transaction must be unique but got ${t.toSeq}.")
+      val uniq = t.toSet//uniq의 값을 t의 인자가 Set형식을 갖는 값을 갖도록 한다.
+      if (t.length != uniq.size) {//t.length가 uniq.size와 같지 않을 때
+        throw new SparkException(s"Items in a transaction must be unique but got ${t.toSeq}.")//spark Exception 발생으로 해당 String을 내보냄
       }
-      t
+      t //아닐 경우 t는 그대로 t로 간다.
     }.map(v => (v, 1L))
-      .reduceByKey(partitioner, _ + _)
-      .filter(_._2 >= minCount)
-      .collect()
-      .sortBy(-_._2)
-      .map(_._1)
+      .reduceByKey(partitioner, _ + _)//key를 기준으로 reduce를 하되 그 값들은 다 더한다.
+      .filter(_._2 >= minCount) //2번째 인수가 minCount보다 클 경우만 가져온다.
+      .collect() //모든 자료를 가져온다.
+      .sortBy(-_._2)//가져온 자료를 2번째 인수를 기준으로 내림차순 정렬한다.
+      .map(_._1)//인수의 1번째 값을 기준으로 map을 진행
   }
 
   /**
@@ -262,16 +262,16 @@ class FPGrowth private (
       minCount: Long,
       freqItems: Array[Item],
       partitioner: Partitioner): RDD[FreqItemset[Item]] = {
-    val itemToRank = freqItems.zipWithIndex.toMap
+    val itemToRank = freqItems.zipWithIndex.toMap//freqItem을 인덱싱을 한 다음에 Map 형식으로 바꾼다.
     data.flatMap { transaction =>
-      genCondTransactions(transaction, itemToRank, partitioner)
+      genCondTransactions(transaction, itemToRank, partitioner) //conditional transaction을 생성하고 모든 값을 하나의 Array 안에 넣는다.
     }.aggregateByKey(new FPTree[Int], partitioner.numPartitions)(
-      (tree, transaction) => tree.add(transaction, 1L),
-      (tree1, tree2) => tree1.merge(tree2))
-    .flatMap { case (part, tree) =>
-      tree.extract(minCount, x => partitioner.getPartition(x) == part)
-    }.map { case (ranks, count) =>
-      new FreqItemset(ranks.map(i => freqItems(i)).toArray, count)
+      (tree, transaction) => tree.add(transaction, 1L),//tree에 key-value 쌍으로 (transaction, 1L)을 추가한다.
+      (tree1, tree2) => tree1.merge(tree2)) //tree1과 tree2를 merge 한다.
+    .flatMap { case (part, tree) => // part, tree 일 때
+      tree.extract(minCount, x => partitioner.getPartition(x) == part) //tree에 값을 추출, partitioner의 값이 part의 값과 같을 때의 값을 추출
+    }.map { case (ranks, count) => //ranks, count 일 때
+      new FreqItemset(ranks.map(i => freqItems(i)).toArray, count)//FreqItemset을 생성, ranks는 map을 통해 i 번째 freqItems의 Array를 가져온다.
     }
   }
 
